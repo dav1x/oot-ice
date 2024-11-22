@@ -1,0 +1,45 @@
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 10-oot-ice
+spec:
+  config:
+    ignition:
+     version: 3.2.0
+    storage:
+      files:
+        - contents: # removes passing rt kernel tag mention + char breaks image tag 
+            source: 'data:text/plain;charset=us-ascii;base64,IyEvYmluL2Jhc2gKc2V0IC1ldQoKQUNUSU9OPSQxOyBzaGlmdApJTUFHRT0kMTsgc2hpZnQKS0VSTkVMPWB1bmFtZSAtcmAKCnBvZG1hbiBwdWxsIC0tdGxzLXZlcmlmeT1mYWxzZSAtLWF1dGhmaWxlIC92YXIvbGliL2t1YmVsZXQvY29uZmlnLmpzb24gJHtJTUFHRX0gMj4mMQoKbG9hZF9rbW9kcygpIHsKCiAgICBwb2RtYW4gcnVuIC1pIC0tcHJpdmlsZWdlZCBcCiAgICAgIC12IC9saWIvbW9kdWxlcy8ke0tFUk5FTH0va2VybmVsL2RyaXZlcnMvOi9saWIvbW9kdWxlcy8ke0tFUk5FTH0va2VybmVsL2RyaXZlcnMvIFwKICAgICAgLXYgL3Zhci9saWIvOi92YXIvbGliLyBcCiAgICAgICR7SU1BR0V9IGxvYWQuc2gKfQp1bmxvYWRfa21vZHMoKSB7CiAgICBwb2RtYW4gcnVuIC1pIC0tcHJpdmlsZWdlZCBcCiAgICAgIC12IC9saWIvbW9kdWxlcy8ke0tFUk5FTH0va2VybmVsL2RyaXZlcnMvOi9saWIvbW9kdWxlcy8ke0tFUk5FTH0va2VybmVsL2RyaXZlcnMvIFwKICAgICAgLXYgL3Zhci9saWIvOi92YXIvbGliLyBcCiAgICAgICR7SU1BR0V9IHVubG9hZC5zaAp9CgpjYXNlICIke0FDVElPTn0iIGluCiAgICBsb2FkKQogICAgICAgIGxvYWRfa21vZHMKICAgIDs7CiAgICB1bmxvYWQpCiAgICAgICAgdW5sb2FkX2ttb2RzCiAgICA7OwogICAgKikKICAgICAgICBlY2hvICJVbmtub3duIGNvbW1hbmQuIEV4aXRpbmcuIgogICAgICAgIGVjaG8gIlVzYWdlOiIKICAgICAgICBlY2hvICIiCiAgICAgICAgZWNobyAibG9hZCAgICAgICAgTG9hZCBrZXJuZWwgbW9kdWxlKHMpIgogICAgICAgIGVjaG8gInVubG9hZCAgICAgIFVubG9hZCBrZXJuZWwgbW9kdWxlKHMpIgogICAgICAgIGV4aXQgMQplc2FjCg=='
+          filesystem: root
+          mode: 493
+          path: /usr/local/bin/oot-ice
+    systemd:
+      units:
+      - contents: |
+          [Unit]
+          Description=out-of-tree driver loader
+          # Start after the network is up
+          Wants=network-online.target
+          After=network-online.target
+          # Also after docker.service (no effect on systems without docker)
+          After=docker.service
+          # Before kubelet.service (no effect on systems without kubernetes)
+          Before=kubelet.service
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=true
+          # Use bash to workaround https://github.com/coreos/rpm-ostree/issues/1936
+          ExecStart=/usr/bin/bash -c "/usr/local/bin/oot-ice load quay.io/dphillip/oot-ice-1.15.4:4.16.13-rt"
+          ExecStop=/usr/bin/bash -c "/usr/local/bin/oot-ice unload quay.io/dphillip/oot-ice-1.15.4:4.16.13-rt"
+          StandardOutput=journal+console
+
+          [Install] 
+          WantedBy=default.target
+        enabled: true
+        name: "oot-ice.service"
+  kernelArguments:
+    - firmware_class.path=/var/lib/firmware
+
